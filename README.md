@@ -12,7 +12,7 @@ Python 3.12, Flask, PostgreSQL 16, Docker Hub e GitHub Actions.
 docker compose up -d --build --wait
 ```
 
-A API fica em `http://localhost:8000`. Verifique `GET /health` ou use `docker compose logs -f api` para consultar os logs. `docker compose down` para os containers, preservando os dados. Não use `down -v` se quiser manter o banco.
+A API fica em `http://localhost`. Verifique `GET /health` ou use `docker compose logs -f api` para consultar os logs. `docker compose down` para os containers, preservando os dados. Não use `down -v` se quiser manter o banco.
 
 O PostgreSQL não publica portas para fora da rede Docker. As tabelas são criadas automaticamente antes de iniciar o Gunicorn. O volume `postgres_data` preserva os dados nas atualizações. Para futuras alterações de esquema, use migrações: `create_all` não altera tabelas existentes.
 
@@ -50,10 +50,10 @@ $body = @{
     preco_unitario = '10.15'
     data_transacao = '2026-09-22'
 } | ConvertTo-Json
-Invoke-RestMethod http://localhost:8000/transacao -Method Post -ContentType 'application/json' -Body $body
-Invoke-RestMethod http://localhost:8000/transacao
-Invoke-RestMethod 'http://localhost:8000/transacao?cliente_id=1'
-Invoke-RestMethod http://localhost:8000/transacao/1 -Method Delete
+Invoke-RestMethod http://localhost/transacao -Method Post -ContentType 'application/json' -Body $body
+Invoke-RestMethod http://localhost/transacao
+Invoke-RestMethod 'http://localhost/transacao?cliente_id=1'
+Invoke-RestMethod http://localhost/transacao/1 -Method Delete
 ```
 
 Resposta de criação:
@@ -81,7 +81,7 @@ O workflow `.github/workflows/deploy.yml` executa testes com PostgreSQL em pull 
 
 ### Preparação do servidor (uma vez)
 
-1. Disponibilize um servidor Linux com Docker Engine e Docker Compose v2 com suporte a `--wait`, SSH e porta 8000 acessível para avaliar a API.
+1. Disponibilize um servidor Linux com Docker Engine e Docker Compose v2 com suporte a `--wait`, SSH e porta 80 acessível para avaliar a API.
 2. O usuário SSH deve ter permissão para usar Docker e gravar em seu diretório pessoal.
 3. Crie `~/transacoes-api/.env` com os campos de `.env.example`: senha forte, nome e usuário do banco, URL de usuários e porta da API. Proteja o arquivo com `chmod 600 ~/transacoes-api/.env`. Não o adicione ao Git.
 4. Crie o repositório `transacoes-api` no Docker Hub. Se for privado, faça `docker login` no servidor com um token de leitura antes do deploy.
@@ -102,6 +102,21 @@ No GitHub, acesse **Settings → Secrets and variables → Actions → New repos
 Crie também o environment `production` no GitHub. Credenciais do banco e URL externa ficam nas variáveis de ambiente do servidor, carregadas do `.env`; o workflow não as embute na imagem. As credenciais `test` do job de testes são descartáveis e não são usadas em produção.
 
 Após configurar, envie o código para `main` ou `master` e acompanhe a aba **Actions**. É possível executar novamente por **Run workflow**. Sem esses Secrets e o `.env` remoto, publicação/deploy falham; não há credenciais reais incluídas neste projeto.
+
+## Porta HTTP no servidor
+
+O deploy define `API_PORT=80`, inclusive se o arquivo `.env` remoto ainda contiver a porta antiga. O Docker encaminha a porta externa 80 para a porta interna 8000. Acesse `http://IP_DO_SERVIDOR/health`. A porta 80 precisa estar livre e permitida na rede do servidor.
+
+Para trocar a porta de uma instalação existente sem baixar outra imagem, no Ubuntu execute:
+
+```bash
+cd ~/transacoes-api
+sed -i 's/^API_PORT=.*/API_PORT=80/' .env
+export API_PORT=80
+export DOCKER_IMAGE=$(docker inspect --format '{{.Config.Image}}' "$(docker compose ps -q api)")
+docker compose up -d --no-build --pull never --wait
+curl --max-time 10 http://localhost/health
+```
 
 ## Testes
 

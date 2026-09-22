@@ -86,6 +86,7 @@ jobs:
           set -euo pipefail
           cd ~/transacoes-api
           test -f .env || { echo 'Configure ~/transacoes-api/.env no servidor antes do deploy.'; exit 1; }
+          export API_PORT=80
           export DOCKER_IMAGE="$1"
           docker compose pull
           docker compose up -d --no-build --wait --wait-timeout 120
